@@ -1,0 +1,42 @@
+https://docs.twenty.com/developers/extend/apps/skills-and-agents
+### defineSkill (Define AI agent skills)
+# src/skills/example-skill.ts file :
+"import { defineSkill } from 'twenty-sdk/define';
+export default defineSkill({
+universalIdentifier: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+name: 'sales-outreach',
+label: 'Sales Outreach',
+description: 'Guides the AI agent through a structured sales outreach process',
+icon: 'IconBrain',
+content: `You are a sales outreach assistant. When reaching out to a prospect:
+1. Research the company and recent news
+2. Identify the prospect's role and likely pain points
+3. Draft a personalized message referencing specific details
+4. Keep the tone professional but conversational`,
+});"
+# Key points:
+# - name is a unique identifier string for the skill (kebab-case recommended).
+# - label is the human-readable display name shown in the UI.
+# - content contains the skill instructions — this is the text the AI agent uses.
+# - icon (optional) sets the icon displayed in the UI.
+# - description (optional) provides additional context about the skill’s purpose.
+
+### DefineAgent (Define AI agents with custom promts)
+# Agents are AI assistants that live inside your workspace. Use defineAgent() to create agents with a custom system prompt:
+# src/agents/example-agent.ts file:
+"import { defineAgent } from 'twenty-sdk/define';
+export default defineAgent({
+universalIdentifier: 'b3c4d5e6-f7a8-9012-bcde-f34567890123',
+name: 'sales-assistant',
+label: 'Sales Assistant',
+description: 'Helps the sales team draft outreach emails and research prospects',
+icon: 'IconRobot',
+prompt: 'You are a helpful sales assistant. Help users with their questions and tasks.',
+});"
+# Key points:
+# - name is the unique identifier string for the agent (kebab-case recommended).
+# - label is the display name shown in the UI.
+# - prompt is the system prompt that defines the agent’s behavior.
+# - description (optional) provides context about what the agent does.
+# - icon (optional) sets the icon displayed in the UI.
+# - modelId (optional) overrides the default AI model used by the agent.

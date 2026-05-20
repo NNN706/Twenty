@@ -2,6 +2,9 @@
   "version": "0.2.0",
   "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"],
   "configurations": [
+
+
+
     {
       "name": "twenty-server - start debug",
       "type": "node",
