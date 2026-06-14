@@ -14,11 +14,11 @@ https://github.com/twentyhq/twenty/blob/main/CLAUDE.md,
 https://github.com/twentyhq/twenty/blob/main/.cursor/rules/README.mdc
 
 ### В CLAUDE.md написано (https://github.com/twentyhq/twenty/blob/main/CLAUDE.md#important-files):
-# Important Files
-# nx.json - Nx workspace configuration with task definitions (https://github.com/twentyhq/twenty/blob/main/nx.json)
-# tsconfig.base.json - Base TypeScript configuration (https://github.com/twentyhq/twenty/blob/main/tsconfig.base.json)
-# package.json - Root package with workspace definitions (https://github.com/twentyhq/twenty/blob/main/package.json)
-# .cursor/rules/ - Detailed development guidelines and best practices (https://github.com/twentyhq/twenty/tree/main/.cursor/rules)
+Important Files
+nx.json - Nx workspace configuration with task definitions (https://github.com/twentyhq/twenty/blob/main/nx.json)
+tsconfig.base.json - Base TypeScript configuration (https://github.com/twentyhq/twenty/blob/main/tsconfig.base.json)
+package.json - Root package with workspace definitions (https://github.com/twentyhq/twenty/blob/main/package.json)
+.cursor/rules/ - Detailed development guidelines and best practices (https://github.com/twentyhq/twenty/tree/main/.cursor/rules)
 
 ### Twenty/.cursor/rules folder
 https://github.com/twentyhq/twenty/blob/main/.cursor/rules/README.mdc,
