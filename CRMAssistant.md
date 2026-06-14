@@ -1,5 +1,5 @@
 https://docs.twenty.com/developers/extend/apps/skills-and-agents
-### defineSkill (Define AI agent skills)
+# defineSkill (Define AI agent skills)
 src/skills/example-skill.ts file :
 "import { defineSkill } from 'twenty-sdk/define';
 export default defineSkill({
@@ -21,7 +21,7 @@ content: `You are a sales outreach assistant. When reaching out to a prospect:
  - icon (optional) sets the icon displayed in the UI.
  - description (optional) provides additional context about the skill’s purpose.
 
-### DefineAgent (Define AI agents with custom promts)
+# DefineAgent (Define AI agents with custom promts)
 Agents are AI assistants that live inside your workspace. Use defineAgent() to create agents with a custom system prompt:
 src/agents/example-agent.ts file:
 "import { defineAgent } from 'twenty-sdk/define';
