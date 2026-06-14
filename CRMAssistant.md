@@ -15,11 +15,11 @@ content: `You are a sales outreach assistant. When reaching out to a prospect:
 4. Keep the tone professional but conversational`,
 });"
 # Key points:
-# - name is a unique identifier string for the skill (kebab-case recommended).
-# - label is the human-readable display name shown in the UI.
-# - content contains the skill instructions — this is the text the AI agent uses.
-# - icon (optional) sets the icon displayed in the UI.
-# - description (optional) provides additional context about the skill’s purpose.
+ - name is a unique identifier string for the skill (kebab-case recommended).
+ - label is the human-readable display name shown in the UI.
+ - content contains the skill instructions — this is the text the AI agent uses.
+ - icon (optional) sets the icon displayed in the UI.
+ - description (optional) provides additional context about the skill’s purpose.
 
 ### DefineAgent (Define AI agents with custom promts)
 # Agents are AI assistants that live inside your workspace. Use defineAgent() to create agents with a custom system prompt:
@@ -34,9 +34,9 @@ icon: 'IconRobot',
 prompt: 'You are a helpful sales assistant. Help users with their questions and tasks.',
 });"
 # Key points:
-# - name is the unique identifier string for the agent (kebab-case recommended).
-# - label is the display name shown in the UI.
-# - prompt is the system prompt that defines the agent’s behavior.
-# - description (optional) provides context about what the agent does.
-# - icon (optional) sets the icon displayed in the UI.
-# - modelId (optional) overrides the default AI model used by the agent.
+ - name is the unique identifier string for the agent (kebab-case recommended).
+ - label is the display name shown in the UI.
+ - prompt is the system prompt that defines the agent’s behavior.
+ - description (optional) provides context about what the agent does.
+ - icon (optional) sets the icon displayed in the UI.
+ - modelId (optional) overrides the default AI model used by the agent.
