@@ -32,6 +32,32 @@ prod-website-build:
 prod-website-run:
 	@docker run -d -p 3000:3000 --name twenty-website twenty-website:$(TAG)
 
+# Build and run server-only image (no frontend)
+prod-server-build:
+	@cd ../.. && docker build --target twenty-server -f ./packages/twenty-docker/twenty/Dockerfile --platform $(PLATFORM) --tag twenty-server:$(TAG) . && cd -
+
+prod-server-run:
+	@docker run -d -p 3000:3000 --name twenty-server twenty-server:$(TAG)
+
+# Build and run frontend-only static image
+prod-front-build:
+	@cd ../.. && docker build -f ./packages/twenty-front/Dockerfile --platform $(PLATFORM) --tag twenty-front:$(TAG) . && cd -
+
+# Build and run frontend runtime image with runtime Node.js server and env injection
+prod-front-runtime-build:
+	@cd ../.. && docker build -f ./packages/twenty-front/Dockerfile.runtime --platform $(PLATFORM) --tag twenty-front-runtime:$(TAG) . && cd -
+
+prod-front-runtime-run:
+	@docker run -d -p 3001:3001 --name twenty-front-runtime \
+		-e REACT_APP_SERVER_BASE_URL=${REACT_APP_SERVER_BASE_URL:-http://localhost:3000} \
+		twenty-front-runtime:$(TAG)
+
+# Note: the `twenty-front` image only contains static files in /build.
+# Use your own webserver (nginx) to serve them. This `prod-front-run` will
+# run the image but it only echoes a message and exits; prefer serving via nginx.
+prod-front-run:
+	@docker run --rm --name twenty-front twenty-front:$(TAG)
+
 # =============================================================================
 # Local Development Services
 # Run these from the repository root: make -C packages/twenty-docker <target>

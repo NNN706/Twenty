@@ -1,0 +1,15 @@
+version: '3.9'
+
+services:
+  frontend:
+    image: ghcr.io/nnn706/twenty-front-runtime:${TAG:-latest}
+    ports:
+      - "3001:3001"
+    environment:
+      REACT_APP_SERVER_BASE_URL: ${REACT_APP_SERVER_BASE_URL:-http://backend-host:3000}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
