@@ -19276,12 +19276,12 @@ __metadata:
   linkType: hard
 
 "@recallai/desktop-sdk@npm:^2.0.0":
-  version: 2.0.8
-  resolution: "@recallai/desktop-sdk@npm:2.0.8"
+  version: 2.0.12
+  resolution: "@recallai/desktop-sdk@npm:2.0.12"
   dependencies:
     tar: "npm:^7.4.3"
     uuid: "npm:^11.1.0"
-  checksum: 10c0/65fa6da758fd36efb4b2396b6f23fb6c3f0bdcf4f7c74fa8a814342f59085eeaebb98f3072c5313ed22981958896d8d4b00a0f68df60d2a60335b6296a7549d8
+  checksum: 10c0/9bd519771638c8b790dbaceebdbb3758aabd07c7ef2211523427f60a1be06fe6c0adca4e8d96c0ad83f5a51f5ab9fe9b9c0e2fc75a3b305408da19070faa2dc6
   languageName: node
   linkType: hard
 
