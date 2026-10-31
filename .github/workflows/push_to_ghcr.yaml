@@ -5,6 +5,11 @@ on:
     branches: [main]
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      existing_tag:
+        description: 'Optional published tag to test without rebuilding images'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -32,6 +37,7 @@ jobs:
       - name: Check frontend proxy behavior
         run: python3 packages/twenty-docker/split/tests/proxy-smoke.py
   build-and-push:
+    if: ${{ !inputs.existing_tag }}
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -90,3 +96,60 @@ jobs:
           IMAGE: ghcr.io/${{ steps.namespace.outputs.owner }}/${{ matrix.image }}
           DIGEST: ${{ steps.build.outputs.digest }}
         run: echo "$IMAGE@$DIGEST" >> "$GITHUB_STEP_SUMMARY"
+
+  integration:
+    needs: [validate, build-and-push]
+    if: ${{ always() && !cancelled() && needs.validate.result == 'success' && (needs.build-and-push.result == 'success' || (needs.build-and-push.result == 'skipped' && inputs.existing_tag != '')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    env:
+      TAG: ${{ inputs.existing_tag || format('sha-{0}', github.sha) }}
+      SERVER_URL: http://localhost:3001
+      BACKEND_BIND_IP: 0.0.0.0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Generate disposable test secrets and backend route
+        run: |
+          python3 - <<'PYTHON'
+          import os, secrets
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              for name in ['APP_SECRET', 'POSTGRES_PASSWORD']:
+                  value = secrets.token_hex(32)
+                  print('::add-mask::' + value)
+                  output.write(name + '=' + value + '\n')
+          PYTHON
+          TASK_GATEWAY=$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')
+          echo "BACKEND_UPSTREAM=http://$TASK_GATEWAY:3000" >> "$GITHUB_ENV"
+      - name: Start backend, database and worker
+        run: docker compose -f packages/twenty-docker/split/compose.backend.yaml up -d --wait --wait-timeout 900
+      - name: Start two independent frontend sites
+        run: |
+          docker compose -p twenty-frontend-a -f packages/twenty-docker/split/compose.frontend.yaml up -d --wait
+          FRONTEND_PORT=3002 docker compose -p twenty-frontend-b -f packages/twenty-docker/split/compose.frontend.yaml up -d --wait
+      - name: Verify both sites reach the initialized API
+        run: |
+          for TASK_PORT in 3001 3002; do
+            curl --fail --silent "http://127.0.0.1:$TASK_PORT/healthz"
+            curl --fail --silent "http://127.0.0.1:$TASK_PORT/client-config" | python3 -c 'import json,sys; assert isinstance(json.load(sys.stdin), dict)'
+            curl --fail --silent "http://127.0.0.1:$TASK_PORT/env-config.js" | grep -F 'window.location.origin'
+          done
+      - name: Container status
+        if: always()
+        run: docker ps -a --format 'table {{.Names}}\t{{.Status}}'
+      - name: Failure diagnostics
+        if: failure()
+        run: docker compose -f packages/twenty-docker/split/compose.backend.yaml logs --tail 100
+      - name: Remove disposable test data
+        if: always()
+        run: |
+          docker compose -p twenty-frontend-a -f packages/twenty-docker/split/compose.frontend.yaml down -v
+          docker compose -p twenty-frontend-b -f packages/twenty-docker/split/compose.frontend.yaml down -v
+          docker compose -f packages/twenty-docker/split/compose.backend.yaml down -v

@@ -42,5 +42,5 @@
 
 - GitHub Actions должен быть включён в форке. На момент read-only проверки он включён и разрешены public actions.
 - Публикация проходит только в namespace владельца через scoped GITHUB_TOKEN. PAT и доступ к registry twentyhq не используются.
-- Из ветки можно вызвать существующий `push_to_ghcr.yaml` через workflow_dispatch, не меняя main. До merge новые правила CI хранятся в ветке/PR. Старые scheduled workflows на main могут продолжать запускаться; их отключение в Settings/Actions — отдельное repository-level действие, которое нужно явно отразить в журнале при выполнении.
+- Из ветки можно вызвать существующий `push_to_ghcr.yaml` через workflow_dispatch, не меняя main. До merge новые правила CI хранятся в ветке/PR. На уровне Settings/Actions все 14 перечисленных архивируемых workflow дополнительно отключены 2026-11-01 (`disabled_manually`), чтобы исключить их scheduled/dispatch запуски ещё до merge PR. Содержимое main не изменялось; состояние workflow можно восстановить через Actions → Enable workflow. Уже завершившиеся неудачные upstream dispatch runs в истории не удалялись.
 - Чтобы снова включить исключённую интеграцию, сначала создайте собственный сервис/секреты и проверьте destinations, затем верните файл в `.github/workflows`. Простое добавление upstream secret names не является настройкой интеграции.

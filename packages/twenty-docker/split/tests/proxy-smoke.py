@@ -58,11 +58,12 @@ try:
         (static / 'index.html').write_text('<html>SPA smoke</html>')
         (static / 'env-config.js').write_text((ROOT / 'twenty-front/env-config.js').read_text())
         conf = (ROOT / 'twenty-front/default.conf.template').read_text()
-        conf = conf.replace('${BACKEND_UPSTREAM}', 'http://127.0.0.1:18080')
         (temp / 'default.conf').write_text(conf)
         subprocess.run(['docker', 'run', '--detach', '--rm', '--name', container,
                         '--network', 'host',
-                        '-v', f'{temp}/default.conf:/etc/nginx/conf.d/default.conf:ro',
+                        '-e', 'BACKEND_UPSTREAM=http://127.0.0.1:18080',
+                        '-e', 'NGINX_ENVSUBST_FILTER=^BACKEND_UPSTREAM$',
+                        '-v', f'{temp}/default.conf:/etc/nginx/templates/default.conf.template:ro',
                         '-v', f'{static}:/usr/share/nginx/html:ro',
                         'nginx:stable-alpine'], check=True)
         for attempt in range(30):
