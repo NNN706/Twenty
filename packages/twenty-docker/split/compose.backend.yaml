@@ -1,0 +1,80 @@
+name: twenty-backend
+
+x-backend-environment: &backend-environment
+  NODE_ENV: production
+  NODE_PORT: 3000
+  SERVER_URL: ${SERVER_URL:?Set canonical public HTTPS URL}
+  FRONTEND_URL: ${SERVER_URL:?Set canonical public HTTPS URL}
+  APP_SECRET: ${APP_SECRET:?Generate a persistent random secret}
+  PG_DATABASE_URL: postgres://twenty:${POSTGRES_PASSWORD:?Generate a URL-safe database password}@db:5432/default
+  REDIS_URL: redis://redis:6379
+  STORAGE_TYPE: local
+  IS_MULTIWORKSPACE_ENABLED: "false"
+  TRUST_PROXY: ${TRUST_PROXY:-2}
+
+services:
+  server:
+    image: ghcr.io/nnn706/twenty-backend:${TAG:?Set matching immutable image tag}
+    restart: unless-stopped
+    environment:
+      <<: *backend-environment
+      DISABLE_DB_MIGRATIONS: "false"
+      DISABLE_CRON_JOBS_REGISTRATION: "false"
+    ports:
+      - "${BACKEND_BIND_IP:-127.0.0.1}:${BACKEND_PORT:-3000}:3000"
+    volumes:
+      - storage:/app/packages/twenty-server/.local-storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://localhost:3000/healthz]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 120s
+  worker:
+    image: ghcr.io/nnn706/twenty-backend:${TAG:?Set matching immutable image tag}
+    restart: unless-stopped
+    command: [yarn, worker:prod]
+    environment:
+      <<: *backend-environment
+      DISABLE_DB_MIGRATIONS: "true"
+      DISABLE_CRON_JOBS_REGISTRATION: "true"
+    volumes:
+      - storage:/app/packages/twenty-server/.local-storage
+    depends_on:
+      server:
+        condition: service_healthy
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: twenty
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Generate a URL-safe database password}
+      POSTGRES_DB: default
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U twenty -d default']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: [redis-server, --appendonly, 'yes', --maxmemory-policy, noeviction]
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  database:
+  storage:
+  redis:

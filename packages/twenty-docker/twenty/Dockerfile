@@ -20,6 +20,7 @@ COPY ./packages/twenty-front-component-renderer/package.json /app/packages/twent
 COPY ./packages/twenty-sdk/package.json /app/packages/twenty-sdk/
 COPY ./packages/twenty-client-sdk/package.json /app/packages/twenty-client-sdk/
 
+ENV NX_DAEMON=false NX_NO_CLOUD=true
 RUN yarn && yarn cache clean && npx nx reset
 
 
@@ -48,6 +49,8 @@ RUN yarn workspaces focus --production twenty-emails twenty-shared twenty-sdk tw
 
 
 FROM common-deps AS twenty-front-build
+
+ENV VITE_BUILD_SOURCEMAP=false
 
 COPY ./packages/twenty-front /app/packages/twenty-front
 COPY ./packages/twenty-front-component-renderer /app/packages/twenty-front-component-renderer
@@ -105,7 +108,7 @@ COPY --chown=1000 --from=twenty-server-build /app/packages/twenty-client-sdk/dis
 COPY --chown=1000 --from=twenty-server-build /app/packages/twenty-ui/package.json /app/packages/twenty-ui/
 COPY --chown=1000 --from=twenty-server-build /app/packages/twenty-front/package.json /app/packages/twenty-front/
 
-LABEL org.opencontainers.image.source=https://github.com/twentyhq/twenty
+LABEL org.opencontainers.image.source=https://github.com/NNN706/Twenty
 LABEL org.opencontainers.image.description="Twenty server image (no frontend)."
 
 RUN mkdir -p /app/.local-storage /app/packages/twenty-server/.local-storage && \
@@ -127,6 +130,23 @@ FROM twenty-server AS twenty-server-aws
 USER root
 RUN apk add --no-cache aws-cli
 USER 1000
+
+
+# ===========================================================================
+# Target: twenty-front (static frontend + same-origin API proxy)
+# ===========================================================================
+
+FROM nginx:stable-alpine AS twenty-front
+COPY --from=twenty-front-build /app/packages/twenty-front/build /usr/share/nginx/html
+COPY packages/twenty-docker/twenty-front/default.conf.template /etc/nginx/templates/default.conf.template
+COPY packages/twenty-docker/twenty-front/env-config.js /usr/share/nginx/html/env-config.js
+ENV BACKEND_UPSTREAM=http://backend:3000
+# Only substitute this variable; preserve nginx's $host, $uri, etc.
+ENV NGINX_ENVSUBST_FILTER=^BACKEND_UPSTREAM$
+EXPOSE 8080
+HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=3 CMD wget -q -O /dev/null http://127.0.0.1:8080/frontend-healthz || exit 1
+LABEL org.opencontainers.image.source=https://github.com/NNN706/Twenty
+LABEL org.opencontainers.image.description="Twenty static frontend with same-origin API proxy."
 
 
 # ===========================================================================
@@ -247,7 +267,7 @@ ENV PG_DATABASE_URL=postgres://twenty:twenty@localhost:5432/default \
 EXPOSE 2020
 VOLUME ["/data/postgres", "/app/packages/twenty-server/.local-storage"]
 
-LABEL org.opencontainers.image.source=https://github.com/twentyhq/twenty
+LABEL org.opencontainers.image.source=https://github.com/NNN706/Twenty
 LABEL org.opencontainers.image.description="All-in-one Twenty image for local development and SDK usage. Includes PostgreSQL, Redis, server, and worker."
 
 ENTRYPOINT ["/init"]
