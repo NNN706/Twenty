@@ -3,3 +3,10 @@
 **/node_modules
 .nx/cache
 packages/twenty-server/.env
+# Local deployment secrets and server artifacts must never enter image builds.
+**/*.env
+**/.env
+**/.env.local
+**/backend.env
+**/frontend.env
+packages/twenty-server/dist

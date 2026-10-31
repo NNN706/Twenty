@@ -1,55 +1,154 @@
-name: Publish to GHCR
+name: Publish split images to GHCR
 
 on:
   push:
-    branches: ['main']
+    branches: [main]
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      existing_tag:
+        description: 'Optional published tag to test without rebuilding images'
+        required: false
+        default: ''
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+permissions:
+  contents: read
+
+concurrency:
+  group: split-images-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  build-and-push:
+  validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose templates
+        env:
+          TAG: sha-validation
+          SERVER_URL: https://crm.example.com
+          APP_SECRET: validation-only
+          POSTGRES_PASSWORD: validation-only
+          BACKEND_UPSTREAM: http://10.77.0.1:3000
+        run: |
+          docker compose -f packages/twenty-docker/split/compose.backend.yaml config --quiet
+          docker compose -f packages/twenty-docker/split/compose.frontend.yaml config --quiet
+      - name: Check frontend proxy behavior
+        run: python3 packages/twenty-docker/split/tests/proxy-smoke.py
+  build-and-push:
+    if: ${{ !inputs.existing_tag }}
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
     permissions:
       contents: read
       packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: twenty-backend
+            target: twenty-server
+          - image: twenty-frontend
+            target: twenty-front
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Free build disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h
+      - name: Lowercase registry namespace
+        id: namespace
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: echo "owner=${OWNER,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
         with:
-            driver-opts: |
-                image=moby/buildkit:master
-                network=host
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
+      - uses: docker/metadata-action@v5
         id: meta
-        uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ghcr.io/${{ steps.namespace.outputs.owner }}/${{ matrix.image }}
           tags: |
+            type=sha,format=long,prefix=sha-
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
-            type=sha,prefix=,format=short
-
-      - name: Build and push
-        uses: docker/build-push-action@v5
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+      - name: Build and publish
+        id: build
+        uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./packages/twenty-docker/twenty/Dockerfile
+          file: packages/twenty-docker/twenty/Dockerfile
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+      - name: Record immutable digest
+        env:
+          IMAGE: ghcr.io/${{ steps.namespace.outputs.owner }}/${{ matrix.image }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: echo "$IMAGE@$DIGEST" >> "$GITHUB_STEP_SUMMARY"
+
+  integration:
+    needs: [validate, build-and-push]
+    if: ${{ always() && !cancelled() && needs.validate.result == 'success' && (needs.build-and-push.result == 'success' || (needs.build-and-push.result == 'skipped' && inputs.existing_tag != '')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    env:
+      TAG: ${{ inputs.existing_tag || format('sha-{0}', github.sha) }}
+      SERVER_URL: http://localhost:3001
+      BACKEND_BIND_IP: 0.0.0.0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Generate disposable test secrets and backend route
+        run: |
+          python3 - <<'PYTHON'
+          import os, secrets
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              for name in ['APP_SECRET', 'POSTGRES_PASSWORD']:
+                  value = secrets.token_hex(32)
+                  print('::add-mask::' + value)
+                  output.write(name + '=' + value + '\n')
+          PYTHON
+          TASK_GATEWAY=$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')
+          echo "BACKEND_UPSTREAM=http://$TASK_GATEWAY:3000" >> "$GITHUB_ENV"
+      - name: Start backend, database and worker
+        run: docker compose -f packages/twenty-docker/split/compose.backend.yaml up -d --wait --wait-timeout 900
+      - name: Start two independent frontend sites
+        run: |
+          docker compose -p twenty-frontend-a -f packages/twenty-docker/split/compose.frontend.yaml up -d --wait
+          FRONTEND_PORT=3002 docker compose -p twenty-frontend-b -f packages/twenty-docker/split/compose.frontend.yaml up -d --wait
+      - name: Verify both sites reach the initialized API
+        run: |
+          for TASK_PORT in 3001 3002; do
+            curl --fail --silent "http://127.0.0.1:$TASK_PORT/healthz"
+            curl --fail --silent "http://127.0.0.1:$TASK_PORT/client-config" | python3 -c 'import json,sys; assert isinstance(json.load(sys.stdin), dict)'
+            curl --fail --silent "http://127.0.0.1:$TASK_PORT/env-config.js" | grep -F 'window.location.origin'
+          done
+      - name: Container status
+        if: always()
+        run: docker ps -a --format 'table {{.Names}}\t{{.Status}}'
+      - name: Failure diagnostics
+        if: failure()
+        run: docker compose -f packages/twenty-docker/split/compose.backend.yaml logs --tail 100
+      - name: Remove disposable test data
+        if: always()
+        run: |
+          docker compose -p twenty-frontend-a -f packages/twenty-docker/split/compose.frontend.yaml down -v
+          docker compose -p twenty-frontend-b -f packages/twenty-docker/split/compose.frontend.yaml down -v
+          docker compose -f packages/twenty-docker/split/compose.backend.yaml down -v
